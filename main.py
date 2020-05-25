@@ -33,6 +33,7 @@ parser.add_argument("--name", type=str, default="")
 # Data
 parser.add_argument("--workers", type=int, default=3, help="workers for dataloader")
 parser.add_argument("--epochs", type=int, default=40, help="number of epochs of training")
+parser.add_argument("--epochs_cls", type=int, default=10, help="number of epochs of training")
 parser.add_argument("--epochs_2", type=int, default=10, help="number of epochs of training")
 parser.add_argument("--batch_size", type=int, default=128, help="size of the batches")
 

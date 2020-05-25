@@ -520,8 +520,8 @@ test_featmaps = np.array(test_featmaps)
 
 # In[9]:
 
-np.save("train_featmaps.npy", train_featmaps)
-np.save("test_featmaps.npy", test_featmaps)
+np.save("train_featmaps_.npy", train_featmaps)
+np.save("test_featmaps_.npy", test_featmaps)
 
 print("Done. Saved feature maps")
 
