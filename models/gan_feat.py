@@ -59,13 +59,19 @@ class gan_feat(GAN):
         for epoch in range(args.epochs):
             self.disc.train()
             self.gen.train()
+
             if args.joint:
+                # Training discriminator and generator with same batch
                 train_loss = self._train_joint(self.args, epoch+1, disc, gen, train_loader, optimizer_d, optimizer_g, train_output_dir)
             else:
+                # Training discriminator for one epoch, then generator for one epoch
                 train_loss = self._train_alt(self.args, epoch+1, disc, gen, train_loader, optimizer_d, optimizer_g, train_output_dir)
             train_losses[epoch] = train_loss
+            
             disc.eval()
             gen.eval()
+            
+            # Frequency to output and visualize results
             if (epoch+1) % args.visualize_freq == 0 or epoch == 0:
                 test_loss = self._test(args, epoch+1, disc, gen, test_loader, test_output_dir)
                 test_losses[epoch] = test_loss
@@ -81,14 +87,15 @@ class gan_feat(GAN):
                     
                 visualize_graph(train_losses, epoch+1, output_dir)
                 
+        # Validate how well training on generated feature maps work on real images
         if args.phase_2:
+            disc.eval()
+            gen.eval()
             for epoch in range(args.epochs, args.epochs+args.epochs_2):
-                disc.train()
-                gen.train()
+                disc2.train()
                 train_loss = self._train_2(args, epoch+1, disc, disc2, gen, train_loader, optimizer_d2, train_output_dir)
                 train_losses[epoch] = train_loss
-                disc.eval()
-                gen.eval()
+                disc2.eval()
                 if (epoch+1) % args.visualize_freq == 0 or epoch == args.epochs:
                     test_loss = self._test_2(args, epoch+1, disc2, test_loader, test_output_dir)
                     test_losses[epoch] = test_loss
@@ -117,14 +124,12 @@ class gan_feat(GAN):
             optimizer_d.zero_grad()
             feats, logits_cls, logits_adv = disc(featmaps)
             loss_cls = cls_criterion(logits_cls, targets.long())
-
             _loss_cls += loss_cls.item()
             loss = loss_cls.clone()
+            
             if args.adv:
                 gen_image = gen(feats.unsqueeze(2).unsqueeze(3).detach())
-
                 feats_gen, logits_cls_gen, logits_adv_gen = disc(gen_image)
-
                 loss_adv = (adversarial_loss(logits_adv, is_real=True, is_disc=True, type_=args.adv_type) + adversarial_loss(logits_adv_gen, is_real=False, is_disc=True, type_=args.adv_type))
                 _loss_adv += loss_adv.item()
                 loss += args.adv_w*loss_adv.clone()/2.
@@ -144,7 +149,7 @@ class gan_feat(GAN):
             optimizer_g.zero_grad()
 
             # Optimize Generator
-            feats, logits_cls, logits_adv = disc(featmaps)
+            feats, logits_cls, logits_adv = disc(featmaps) # call discriminator to get feats to feed into generator
             gen_image = gen(feats.unsqueeze(2).unsqueeze(3).detach())
 
             feats_gen, logits_cls_gen, logits_adv_gen = disc(gen_image)
