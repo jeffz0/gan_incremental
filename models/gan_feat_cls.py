@@ -21,7 +21,7 @@ from torch.nn import functional as F
 import torchvision
 
 
-class gan_feat_stored(GAN):
+class gan_feat_cls(GAN):
     """Implementation of Learning without Forgetting.
 
     :param args: An argparse parsed arguments object.
@@ -73,7 +73,7 @@ class gan_feat_stored(GAN):
                 with open(output_dir +'/test_losses.txt', 'w') as f:
                     json.dump(test_losses, f)
                     
-        self._build_statistics(args, train_loader, disc)
+#         self._build_statistics(args, train_loader, disc)
         
         for epoch in range(args.epochs_cls, args.epochs_cls+args.epochs):
             self.disc.train()
@@ -112,7 +112,7 @@ class gan_feat_stored(GAN):
             gen.eval()
             for epoch in range(args.epochs_cls+args.epochs, args.epochs_cls+args.epochs+args.epochs_2):
                 disc2.train()
-                train_loss = self._train_2(args, epoch+1, disc2, gen, train_loader, optimizer_d2, train_output_dir)
+                train_loss = self._train_2(args, epoch+1, disc, disc2, gen, train_loader, optimizer_d2, train_output_dir)
                 train_losses[epoch] = train_loss
                 disc2.eval()
                 if (epoch+1) % args.visualize_freq == 0 or epoch == args.epochs_cls+args.epochs:
@@ -175,8 +175,8 @@ class gan_feat_stored(GAN):
             loss = loss_cls.clone()
             
             if args.adv:
-                feats, gen_targets = self._sample_vecs(inputs.shape[0])
-                feats = feats.to(args.device)
+#                 feats, gen_targets = self._sample_vecs(inputs.shape[0])
+#                 feats = feats.to(args.device)
                 gen_image = gen(feats.unsqueeze(2).unsqueeze(3).detach())
                 feats_gen, logits_cls_gen, logits_adv_gen = disc(gen_image)
                 loss_adv = (adversarial_loss(logits_adv, is_real=True, is_disc=True, type_=args.adv_type) + adversarial_loss(logits_adv_gen, is_real=False, is_disc=True, type_=args.adv_type))
@@ -198,13 +198,15 @@ class gan_feat_stored(GAN):
             optimizer_g.zero_grad()
 
             # Optimize Generator
-            feats, gen_targets = self._sample_vecs(inputs.shape[0])
-            feats, gen_targets = feats.to(args.device), gen_targets.to(args.device)
+            feats, logits_cls, logits_adv = disc(featmaps)
+#             feats, gen_targets = self._sample_vecs(inputs.shape[0])
+#             feats, gen_targets = feats.to(args.device), gen_targets.to(args.device)
             gen_image = gen(feats.unsqueeze(2).unsqueeze(3).detach())
 
             feats_gen, logits_cls_gen, logits_adv_gen = disc(gen_image)
 
-            loss_cls_gen = cls_criterion(logits_cls_gen, gen_targets.long())
+            loss_cls_gen = cls_criterion(logits_cls_gen, targets.long())
+#             loss_cls_gen = cls_criterion(logits_cls_gen, gen_targets.long())
             _loss_cls_gen += loss_cls_gen.item() 
             loss = args.cls_w*loss_cls_gen.clone()
 
@@ -247,8 +249,8 @@ class gan_feat_stored(GAN):
             _loss_cls += loss_cls.item()
             loss = loss_cls.clone()
             if args.adv:
-                feats, gen_targets = self._sample_vecs(inputs.shape[0])
-                feats = feats.to(args.device)
+#                 feats, gen_targets = self._sample_vecs(inputs.shape[0])
+#                 feats = feats.to(args.device)
                 gen_image = gen(feats.unsqueeze(2).unsqueeze(3).detach())
 
                 feats_gen, logits_cls_gen, logits_adv_gen = disc(gen_image)
@@ -270,13 +272,15 @@ class gan_feat_stored(GAN):
             optimizer_g.zero_grad()
 
             # Optimize Generator
-            feats, gen_targets = self._sample_vecs(inputs.shape[0])
-            feats, gen_targets = feats.to(args.device), gen_targets.to(args.device)
+            feats, logits_cls, logits_adv = disc(featmaps)
+#             feats, gen_targets = self._sample_vecs(inputs.shape[0])
+#             feats, gen_targets = feats.to(args.device), gen_targets.to(args.device)
             gen_image = gen(feats.unsqueeze(2).unsqueeze(3).detach())
 
             feats_gen, logits_cls_gen, logits_adv_gen = disc(gen_image)
 
-            loss_cls_gen = cls_criterion(logits_cls_gen, gen_targets.long())
+            loss_cls_gen = cls_criterion(logits_cls_gen, targets.long())
+#             loss_cls_gen = cls_criterion(logits_cls_gen, gen_targets.long())
             _loss_cls_gen += loss_cls_gen.item() 
             loss = args.cls_w*loss_cls_gen.clone()
 
@@ -326,8 +330,8 @@ class gan_feat_stored(GAN):
             ypred.extend(preds)
             ytrue.extend(targets)
             
-            feats, gen_targets = self._sample_vecs(inputs.shape[0])
-            feats = feats.to(args.device)
+#             feats, gen_targets = self._sample_vecs(inputs.shape[0])
+#             feats = feats.to(args.device)
             gen_image = gen(feats.unsqueeze(2).unsqueeze(3).detach())
             feats_gen, logits_cls_gen, logits_adv_gen = disc(gen_image)
             loss_cls_gen = cls_criterion(logits_cls_gen, targets.long())
@@ -364,7 +368,7 @@ class gan_feat_stored(GAN):
                   .format(_loss_adv/(i+1),_loss_adv_gen/(i+1)))
         return return_statement(i, acc, acc_gen, _loss_cls, _loss_cls_gen, _loss_adv, _loss_adv_gen)
 
-    def _train_2(self, args, epoch, disc, gen, train_loader, optimizer_d, train_output_dir):
+    def _train_2(self, args, epoch, old_disc, disc, gen, train_loader, optimizer_d, train_output_dir):
         cls_criterion = nn.CrossEntropyLoss()
         _loss_g, _loss_cls_gen, _loss_adv_gen = 0., 0., 0.
         _loss_d, _loss_cls, _loss_adv = 0., 0., 0.
@@ -378,13 +382,15 @@ class gan_feat_stored(GAN):
             loss = 0
             optimizer_d.zero_grad()
 
-            feats, gen_targets = self._sample_vecs(inputs.shape[0])
-            feats, gen_targets = feats.to(args.device), gen_targets.to(args.device)
+#             feats, gen_targets = self._sample_vecs(inputs.shape[0])
+#             feats, gen_targets = feats.to(args.device), gen_targets.to(args.device)
+            feats, logits_cls, logits_adv = old_disc(featmaps)
             gen_image = gen(feats.unsqueeze(2).unsqueeze(3).detach())
 
             feats_gen, logits_cls_gen, logits_adv_gen = disc(gen_image)
 
-            loss_cls_gen = cls_criterion(logits_cls_gen, gen_targets.long())
+            loss_cls_gen = cls_criterion(logits_cls_gen, targets.long())
+#             loss_cls_gen = cls_criterion(logits_cls_gen, gen_targets.long())
             loss = loss_cls_gen
             _loss_cls_gen += loss_cls_gen.item()  
 

@@ -2,7 +2,7 @@ import torch
 from torch import optim
 
 from convnet import generator, discriminator, resnet
-from models import gan_feat, gan_random_feat, gan_feat_stored
+from models import gan_feat, gan_random_feat, gan_feat_stored, gan_feat_cls
 import torchvision.transforms as transforms
 import data
     
@@ -38,6 +38,8 @@ def get_model(args, disc, disc2, gen):
         return gan_random_feat.gan_random_feat(args, disc, disc2, gen)
     elif args.model == "gan_feat_stored":
         return gan_feat_stored.gan_feat_stored(args, disc, disc2, gen)
+    elif args.model == "gan_feat_cls":
+        return gan_feat_cls.gan_feat_cls(args, disc, disc2, gen)
 
 def get_data(data_name, batch_size, workers):
     if data_name == "image":
