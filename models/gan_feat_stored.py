@@ -215,7 +215,7 @@ class gan_feat_stored(GAN):
 
             preds_gen = F.softmax(logits_cls_gen, dim=1).argmax(dim=1).cpu().numpy().tolist()
             ypred_gen.extend(preds_gen)
-            ytrue_gen.extend(targets)
+            ytrue_gen.extend(gen_targets)
 
             loss.backward()
             optimizer_g.step()
@@ -287,7 +287,7 @@ class gan_feat_stored(GAN):
 
             preds_gen = F.softmax(logits_cls_gen, dim=1).argmax(dim=1).cpu().numpy().tolist()
             ypred_gen.extend(preds_gen)
-            ytrue_gen.extend(targets)
+            ytrue_gen.extend(gen_targets)
 
             loss.backward()
             optimizer_g.step()
@@ -327,10 +327,10 @@ class gan_feat_stored(GAN):
             ytrue.extend(targets)
             
             feats, gen_targets = self._sample_vecs(inputs.shape[0])
-            feats = feats.to(args.device)
+            feats, gen_targets = feats.to(args.device), gen_targets.to(args.device)
             gen_image = gen(feats.unsqueeze(2).unsqueeze(3).detach())
             feats_gen, logits_cls_gen, logits_adv_gen = disc(gen_image)
-            loss_cls_gen = cls_criterion(logits_cls_gen, targets.long())
+            loss_cls_gen = cls_criterion(logits_cls_gen, gen_targets.long())
             loss += args.cls_w*loss_cls_gen
             _loss_cls_gen += loss_cls_gen.item()   
 
@@ -345,7 +345,7 @@ class gan_feat_stored(GAN):
                 loss += args.adv_w*loss_adv_gen.clone()
             preds_gen = F.softmax(logits_cls_gen, dim=1).argmax(dim=1).cpu().numpy().tolist()
             ypred_gen.extend(preds_gen)
-            ytrue_gen.extend(targets)
+            ytrue_gen.extend(gen_targets)
             _loss += loss.item()
 
             if i%10 == 0:
@@ -390,7 +390,7 @@ class gan_feat_stored(GAN):
 
             preds_gen = F.softmax(logits_cls_gen, dim=1).argmax(dim=1).cpu().numpy().tolist()
             ypred_gen.extend(preds_gen)
-            ytrue_gen.extend(targets)
+            ytrue_gen.extend(gen_targets)
 
             loss.backward()
             optimizer_d.step()
@@ -470,5 +470,6 @@ class gan_feat_stored(GAN):
             vec_targets.append(torch.Tensor([label]))
         vecs = torch.stack(vecs)
         vec_targets = torch.stack(vec_targets).squeeze(1)
-        
+#         import pdb
+#         pdb.set_trace()
         return vecs, vec_targets

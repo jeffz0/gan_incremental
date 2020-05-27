@@ -25,7 +25,7 @@ parser = argparse.ArgumentParser()
 # Model
 parser.add_argument("--data", type=str, default="featmap", help="type of training data")
 parser.add_argument("--model", type=str, default="gan_feat", help="model for training")
-parser.add_argument("--disc", type=str, default="", help="type of discriminator")
+parser.add_argument("--disc", type=str, default="no_resnet", help="type of discriminator")
 parser.add_argument("--gen", type=str, default="", help="type of generator")
 parser.add_argument("--deconv", action="store_true", default=False)
 parser.add_argument("--name", type=str, default="")
