@@ -44,6 +44,8 @@ parser.add_argument("--optimizer", type=str, default="adam", help="options=[sgd,
 parser.add_argument("--cls_w", type=float, default=1, help="classification weight")
 parser.add_argument("--adv", action="store_true", default=False)
 parser.add_argument("--adv_w", type=float, default=1, help="adversarial weight")
+parser.add_argument("--recon", action="store_true", default=False)
+parser.add_argument("--adv_r", type=float, default=1, help="recon weight")
 parser.add_argument("--random_z", action="store_true", default=False)
 parser.add_argument("--joint", action="store_true", default=False)
 parser.add_argument("--adv_type", type=str, default="hinge", help="options=[hinge,nsgan,lsgan]")
@@ -64,6 +66,8 @@ if __name__ == "__main__":
     model_name = "data_{}_disc_{}_gen_{}_deconv_{}_gan_{}_{}_lr_{}_gen_factor_{}_cls_{}_".format(args.data, args.disc, args.gen, args.deconv, args.adv_type, args.optimizer, args.lr, args.gen_lr_factor, args.cls_w)
 #     if args.adv:
 #         model_name = "{}adv_{}_".format(model_name, args.adv_w)
+    if args.recon:
+        model_name = "{}recon_{}_".format(model_name, args.adv_r)
     if args.joint:
         model_name = "{}joint_".format(model_name)
     if args.phase_2:
@@ -89,6 +93,10 @@ if __name__ == "__main__":
     test_output_dir = os.path.join(output_dir,"test/")
     if not os.path.exists(test_output_dir):
         os.mkdir(test_output_dir)
+        
+    for i in range(10):
+        if not os.path.exists(os.path.join(test_output_dir, str(i))):
+            os.mkdir(os.path.join(test_output_dir, str(i)))
 
     # Load data
     train_loader, test_loader = factory.get_data(args.data, args.batch_size, args.workers)
@@ -103,8 +111,13 @@ if __name__ == "__main__":
     if args.test:
         disc.load_state_dict(torch.load(model_output_dir + 'disc.pth'))
         gen.load_state_dict(torch.load(model_output_dir + 'gen.pth'))
-        print("Loaded model")
-        test_loss = test(args, args.epochs, disc, gen, test_loader, test_output_dir)
+        print("TESTING, Loaded model")
+
+        disc.eval()
+        gen.eval()
+        
+        model._build_statistics(args, train_loader, disc)
+        test_loss = model._test(args, args.epochs_cls+args.epochs+1, disc, gen, test_loader, test_output_dir)
         print("Outputted test results")
     else:
         with open(output_dir +'/config.txt', 'w') as f:

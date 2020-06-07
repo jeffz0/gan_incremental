@@ -71,6 +71,26 @@ def visualize_featmap(featmaps, gen_image, out_dir=None):
         plt.savefig(out_dir)
     plt.show()
     
+    
+def visualize_featmap_classes(featmaps, gen_image, labels, cls_count, out_dir):
+    for i in range(len(featmaps)):
+        label = int(labels[i].detach().cpu().numpy())
+        if cls_count[label] < 10:
+            for j in range(8):
+                plt.subplot(2,8,j+1)
+                plt.imshow((featmaps[i][0*8+j].detach().cpu().numpy()+1.)/2)
+                plt.axis('off')
+            for j in range(8):
+                plt.subplot(2,8,8+j+1)
+                plt.imshow((gen_image[i][0*8+j].detach().cpu().numpy()+1.)/2)
+                plt.axis('off')
+
+            plt.savefig(os.path.join(out_dir, str(label), str(cls_count[label]) + '.jpg'))
+            plt.show()
+                
+            cls_count[label] += 1
+    
+    
 def visualize_graph(train_losses, epochs, out_dir):
     loss_cls = []
     loss_cls_gen = []
@@ -139,7 +159,7 @@ def adversarial_loss(outputs, is_real, is_disc=None, type_='nsgan', target_real_
             return loss
 
         
-def print_statement(epoch, i, acc, acc_gen, _loss_cls, _loss_cls_gen, _loss_adv=None, _loss_adv_gen=None):
+def print_statement(epoch, i, acc, acc_gen, _loss_cls, _loss_cls_gen, _loss_adv=None, _loss_adv_gen=None, _loss_recon=None):
     print("Epoch {}, Training Iteration {}".format(epoch, i))
     print("Accuracy: {}, Accuracy gen: {}".format(acc, acc_gen))
     print("Loss_cls: {}, Loss_cls_gen: {}"
@@ -147,6 +167,12 @@ def print_statement(epoch, i, acc, acc_gen, _loss_cls, _loss_cls_gen, _loss_adv=
     if _loss_adv is not None:
         print("Loss_adv: {}, Loss_adv_gen: {}"
           .format(_loss_adv/(i+1),_loss_adv_gen/(i+1)))
+    if _loss_recon is not None:
+        print("Loss_recon: {}"
+          .format(_loss_recon/(i+1)))
         
-def return_statement(i, acc, acc_gen, _loss_cls, _loss_cls_gen, _loss_adv, _loss_adv_gen):
+def return_statement(i, acc, acc_gen, _loss_cls, _loss_cls_gen, _loss_adv, _loss_adv_gen, _recon=None):
+    if _recon is not None:
+        return {"Train_acc": acc,"Train_acc_gen": acc_gen,"Loss_cls":_loss_cls/(i+1), "Loss_cls_gen":_loss_cls_gen/(i+1),"Loss_adv":_loss_adv/(i+1), "Loss_adv_gen":_loss_adv_gen/(i+1), "Loss_recon":_recon/(i+1)}
     return {"Train_acc": acc,"Train_acc_gen": acc_gen,"Loss_cls":_loss_cls/(i+1), "Loss_cls_gen":_loss_cls_gen/(i+1),"Loss_adv":_loss_adv/(i+1), "Loss_adv_gen":_loss_adv_gen/(i+1)}
+    

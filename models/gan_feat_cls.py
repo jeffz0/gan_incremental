@@ -8,7 +8,7 @@ import os, sys
 import json
 from models.base import GAN
 
-from utils import visualize_featmap as visualize, adversarial_loss, visualize_graph, print_statement, return_statement
+from utils import visualize_featmap as visualize, adversarial_loss, visualize_graph, print_statement, return_statement, visualize_featmap_classes
 
 import numpy as np
 import factory
@@ -161,6 +161,7 @@ class gan_feat_cls(GAN):
         cls_criterion = nn.CrossEntropyLoss()
         _loss_g, _loss_cls_gen, _loss_adv_gen = 0., 0., 0.
         _loss_d, _loss_cls, _loss_adv = 0., 0., 0.
+        _loss_recon = 0.
         ypred, ypred_gen = [], []
         ytrue, ytrue_gen = [], []
     #     gen_loss_lst = []
@@ -214,6 +215,10 @@ class gan_feat_cls(GAN):
                 loss_adv_gen = adversarial_loss(logits_adv_gen, is_real=True, is_disc=False, type_=args.adv_type)
                 _loss_adv_gen += loss_adv_gen.item()
                 loss += args.adv_w*loss_adv_gen.clone()
+            if args.recon:
+                loss_recon = (1-nn.CosineSimilarity(dim=1, eps=1e-6)(feats_gen, feats).mean())
+                loss += args.adv_r*loss_recon.clone()
+                _loss_recon += loss_recon.item()
 
             preds_gen = F.softmax(logits_cls_gen, dim=1).argmax(dim=1).cpu().numpy().tolist()
             ypred_gen.extend(preds_gen)
@@ -226,15 +231,16 @@ class gan_feat_cls(GAN):
         acc = round((np.array(ypred) == np.array(ytrue)).sum() / len(ytrue), 4)  
         acc_gen = round((np.array(ypred_gen) == np.array(ytrue_gen)).sum() / len(ytrue_gen), 4)  
         if epoch % args.visualize_freq == 0 or epoch == 1:
-            print_statement(epoch, i, acc, acc_gen, _loss_cls, _loss_cls_gen, _loss_adv, _loss_adv_gen)
+            print_statement(epoch, i, acc, acc_gen, _loss_cls, _loss_cls_gen, _loss_adv, _loss_adv_gen, _loss_recon)
             visualize(featmaps[0], gen_image[0],
                       out_dir = train_output_dir + str(epoch) + "_" + str(i) + ".jpg")
-        return return_statement(i, acc, acc_gen, _loss_cls, _loss_cls_gen, _loss_adv, _loss_adv_gen)
+        return return_statement(i, acc, acc_gen, _loss_cls, _loss_cls_gen, _loss_adv, _loss_adv_gen, _loss_recon)
 
     def _train_joint(self, args, epoch, disc, gen, train_loader, optimizer_d, optimizer_g, train_output_dir):
         cls_criterion = nn.CrossEntropyLoss()
         _loss_g, _loss_cls_gen, _loss_adv_gen = 0., 0., 0.
         _loss_d, _loss_cls, _loss_adv = 0., 0., 0.
+        _loss_recon = 0.
         ypred, ypred_gen = [], []
         ytrue, ytrue_gen = [], []
     #     gen_loss_lst = []
@@ -288,6 +294,10 @@ class gan_feat_cls(GAN):
                 loss_adv_gen = adversarial_loss(logits_adv_gen, is_real=True, is_disc=False, type_=args.adv_type)
                 _loss_adv_gen += loss_adv_gen.item()
                 loss += args.adv_w*loss_adv_gen.clone()
+            if args.recon:
+                loss_recon = (1-nn.CosineSimilarity(dim=1, eps=1e-6)(feats_gen, feats).mean())
+                loss += args.adv_r*loss_recon.clone()
+                _loss_recon += loss_recon.item()
 
             preds_gen = F.softmax(logits_cls_gen, dim=1).argmax(dim=1).cpu().numpy().tolist()
             ypred_gen.extend(preds_gen)
@@ -302,10 +312,10 @@ class gan_feat_cls(GAN):
         acc_gen = round((np.array(ypred_gen) == np.array(ytrue_gen)).sum() / len(ytrue_gen), 4)  
         
         if epoch % args.visualize_freq == 0 or epoch == 1:
-            print_statement(epoch, i, acc, acc_gen, _loss_cls, _loss_cls_gen, _loss_adv, _loss_adv_gen)
+            print_statement(epoch, i, acc, acc_gen, _loss_cls, _loss_cls_gen, _loss_adv, _loss_adv_gen, _loss_recon)
             visualize(featmaps[0], gen_image[0],
                       out_dir = train_output_dir + str(epoch) + "_" + str(i) + ".jpg")
-        return return_statement(i, acc, acc_gen, _loss_cls, _loss_cls_gen, _loss_adv, _loss_adv_gen)
+        return return_statement(i, acc, acc_gen, _loss_cls, _loss_cls_gen, _loss_adv, _loss_adv_gen, _loss_recon)
 
 
 
@@ -314,9 +324,11 @@ class gan_feat_cls(GAN):
         cls_criterion = nn.CrossEntropyLoss()
         _loss_g, _loss_cls_gen, _loss_adv_gen = 0., 0., 0.
         _loss_d, _loss_cls, _loss_adv = 0., 0., 0.
+        _loss_recon = 0.
         _loss = 0.
         ypred, ypred_gen = [], []
         ytrue, ytrue_gen = [], []
+        cls_count = [0]*10
         for i, (inputs, featmaps, targets) in enumerate(test_loader):
             loss = 0
             inputs, featmaps, targets = inputs.to(args.device), featmaps.to(args.device), targets.to(args.device)
@@ -347,6 +359,11 @@ class gan_feat_cls(GAN):
                 loss_adv_gen = adversarial_loss(logits_adv_gen, is_real=True, is_disc=False, type_=args.adv_type)
                 _loss_adv_gen += loss_adv_gen.item()
                 loss += args.adv_w*loss_adv_gen.clone()
+            if args.recon:
+                loss_recon = (1-nn.CosineSimilarity(dim=1, eps=1e-6)(feats_gen, feats).mean())
+                loss += args.adv_r*loss_recon.clone()
+                _loss_recon += loss_recon.item()
+                
             preds_gen = F.softmax(logits_cls_gen, dim=1).argmax(dim=1).cpu().numpy().tolist()
             ypred_gen.extend(preds_gen)
             ytrue_gen.extend(targets)
@@ -355,6 +372,9 @@ class gan_feat_cls(GAN):
             if i%10 == 0:
                 visualize(featmaps[0], gen_image[0],
                           out_dir = test_output_dir + str(epoch) + "_" + str(i) + ".jpg")
+                
+            if sum(cls_count) < 100:
+                visualize_featmap_classes(featmaps, gen_image, targets, cls_count, test_output_dir)
 
         acc = round((np.array(ypred) == np.array(ytrue)).sum() / len(ytrue), 4)  
         acc_gen = round((np.array(ypred_gen) == np.array(ytrue_gen)).sum() / len(ytrue_gen), 4)  
@@ -366,7 +386,7 @@ class gan_feat_cls(GAN):
         if args.adv:
             print("Loss_adv: {}, Loss_adv_gen: {}"
                   .format(_loss_adv/(i+1),_loss_adv_gen/(i+1)))
-        return return_statement(i, acc, acc_gen, _loss_cls, _loss_cls_gen, _loss_adv, _loss_adv_gen)
+        return return_statement(i, acc, acc_gen, _loss_cls, _loss_cls_gen, _loss_adv, _loss_adv_gen, _loss_recon)
 
     def _train_2(self, args, epoch, old_disc, disc, gen, train_loader, optimizer_d, train_output_dir):
         cls_criterion = nn.CrossEntropyLoss()
