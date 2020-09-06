@@ -58,6 +58,7 @@ class Generator(nn.Module):
         return decoded
 
 class Generator_emb(nn.Module):
+    # Generator with embedding of class as input
     def __init__(self, width = 12, deconv = False):
         super(Generator_emb, self).__init__()
         # Input size: [batch, 3, 32, 32]

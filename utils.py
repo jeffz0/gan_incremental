@@ -75,7 +75,7 @@ def visualize_featmap(featmaps, gen_image, out_dir=None):
 def visualize_featmap_classes(featmaps, gen_image, labels, cls_count, out_dir):
     for i in range(len(featmaps)):
         label = int(labels[i].detach().cpu().numpy())
-        if cls_count[label] < 10:
+        if cls_count[label] < 5:
             for j in range(8):
                 plt.subplot(2,8,j+1)
                 plt.imshow((featmaps[i][0*8+j].detach().cpu().numpy()+1.)/2)
@@ -89,15 +89,20 @@ def visualize_featmap_classes(featmaps, gen_image, labels, cls_count, out_dir):
             plt.show()
                 
             cls_count[label] += 1
+    return cls_count
     
     
-def visualize_graph(train_losses, epochs, out_dir):
+def visualize_graph(train_losses, epochs, out_dir, recon=False, mse=False):
     loss_cls = []
     loss_cls_gen = []
     loss_adv = []
     loss_adv_gen = []
     acc = []
     acc_gen = []
+    if recon:
+        recon_lst = []
+    if mse:
+        mse_lst = []
     for i in range(epochs):
         loss_cls.append(train_losses[i]['Loss_cls'])
         loss_cls_gen.append(train_losses[i]['Loss_cls_gen'])
@@ -105,6 +110,10 @@ def visualize_graph(train_losses, epochs, out_dir):
         loss_adv_gen.append(train_losses[i]['Loss_adv_gen'])
         acc.append(train_losses[i]['Train_acc'])
         acc_gen.append(train_losses[i]['Train_acc_gen'])   
+        if "Loss_recon" in train_losses[i] and recon:
+            recon_lst.append(train_losses[i]['Loss_recon'])  
+        if "Loss_mse" in train_losses[i] and mse:
+            mse_lst.append(train_losses[i]['Loss_mse'])  
     
     
     plt.figure(figsize=(10,6))
@@ -130,6 +139,20 @@ def visualize_graph(train_losses, epochs, out_dir):
     plt.legend()
     plt.savefig(out_dir + '/acc.jpg')
     plt.show()
+    
+    if recon:
+        plt.figure(figsize=(10,6))
+        plt.title("Cosine Similarity Loss")
+        plt.plot(recon_lst)
+        plt.savefig(out_dir + '/recon.jpg')
+        plt.show()
+
+    if mse:
+        plt.figure(figsize=(10,6))
+        plt.title("MSE featuremap Loss")
+        plt.plot(mse_lst)
+        plt.savefig(out_dir + '/mse.jpg')
+        plt.show() 
     
     
 def adversarial_loss(outputs, is_real, is_disc=None, type_='nsgan', target_real_label=1.0, target_fake_label=0.0):
@@ -159,7 +182,7 @@ def adversarial_loss(outputs, is_real, is_disc=None, type_='nsgan', target_real_
             return loss
 
         
-def print_statement(epoch, i, acc, acc_gen, _loss_cls, _loss_cls_gen, _loss_adv=None, _loss_adv_gen=None, _loss_recon=None):
+def print_statement(epoch, i, acc, acc_gen, _loss_cls, _loss_cls_gen, _loss_adv=None, _loss_adv_gen=None, _loss_recon=None, _loss_mse=None):
     print("Epoch {}, Training Iteration {}".format(epoch, i))
     print("Accuracy: {}, Accuracy gen: {}".format(acc, acc_gen))
     print("Loss_cls: {}, Loss_cls_gen: {}"
@@ -170,8 +193,15 @@ def print_statement(epoch, i, acc, acc_gen, _loss_cls, _loss_cls_gen, _loss_adv=
     if _loss_recon is not None:
         print("Loss_recon: {}"
           .format(_loss_recon/(i+1)))
+    if _loss_mse is not None:
+        print("Loss_recon: {}"
+          .format(_loss_mse/(i+1)))
         
-def return_statement(i, acc, acc_gen, _loss_cls, _loss_cls_gen, _loss_adv, _loss_adv_gen, _recon=None):
+def return_statement(i, acc, acc_gen, _loss_cls, _loss_cls_gen, _loss_adv, _loss_adv_gen, _recon=None, _loss_mse=None):
+    if _loss_mse is not None:
+        if _recon is not None:
+            return {"Train_acc": acc,"Train_acc_gen": acc_gen,"Loss_cls":_loss_cls/(i+1), "Loss_cls_gen":_loss_cls_gen/(i+1),"Loss_adv":_loss_adv/(i+1), "Loss_adv_gen":_loss_adv_gen/(i+1), "Loss_recon":_recon/(i+1), "Loss_mse":_loss_mse/(i+1)}
+        return {"Train_acc": acc,"Train_acc_gen": acc_gen,"Loss_cls":_loss_cls/(i+1), "Loss_cls_gen":_loss_cls_gen/(i+1),"Loss_adv":_loss_adv/(i+1), "Loss_adv_gen":_loss_adv_gen/(i+1), "Loss_mse":_loss_mse/(i+1)}
     if _recon is not None:
         return {"Train_acc": acc,"Train_acc_gen": acc_gen,"Loss_cls":_loss_cls/(i+1), "Loss_cls_gen":_loss_cls_gen/(i+1),"Loss_adv":_loss_adv/(i+1), "Loss_adv_gen":_loss_adv_gen/(i+1), "Loss_recon":_recon/(i+1)}
     return {"Train_acc": acc,"Train_acc_gen": acc_gen,"Loss_cls":_loss_cls/(i+1), "Loss_cls_gen":_loss_cls_gen/(i+1),"Loss_adv":_loss_adv/(i+1), "Loss_adv_gen":_loss_adv_gen/(i+1)}

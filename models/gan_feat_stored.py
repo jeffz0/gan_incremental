@@ -73,8 +73,11 @@ class gan_feat_stored(GAN):
                 with open(output_dir +'/test_losses.txt', 'w') as f:
                     json.dump(test_losses, f)
                     
-        self._build_statistics(args, train_loader, disc)
-        
+        if args.index_sampling:
+            self._build_statistics_index(args, train_loader, disc)
+        else:
+            self._build_statistics(args, train_loader, disc)
+            
         for epoch in range(args.epochs_cls, args.epochs_cls+args.epochs):
             self.disc.train()
             self.gen.train()
@@ -104,7 +107,7 @@ class gan_feat_stored(GAN):
                 with open(output_dir +'/test_losses.txt', 'w') as f:
                     json.dump(test_losses, f)
                     
-                visualize_graph(train_losses, epoch+1, output_dir)
+                visualize_graph(train_losses, epoch+1, output_dir, recon=args.recon)
                 
         # Validate how well training on generated feature maps work on real images
         if args.phase_2:
@@ -134,7 +137,7 @@ class gan_feat_stored(GAN):
         ypred, ypred_gen = [], []
         ytrue, ytrue_gen = [], []
     #     gen_loss_lst = []
-        for i, (inputs, featmaps, targets) in enumerate(train_loader):
+        for i, (inputs, featmaps, targets, indexes) in enumerate(train_loader):
             inputs, featmaps, targets = inputs.to(args.device), featmaps.to(args.device), targets.to(args.device)
             # Optimize Discriminator
             loss = 0
@@ -165,7 +168,7 @@ class gan_feat_stored(GAN):
         ypred, ypred_gen = [], []
         ytrue, ytrue_gen = [], []
     #     gen_loss_lst = []
-        for i, (inputs, featmaps, targets) in enumerate(train_loader):
+        for i, (inputs, featmaps, targets, indexes) in enumerate(train_loader):
             inputs, featmaps, targets = inputs.to(args.device), featmaps.to(args.device), targets.to(args.device)
             # Optimize Discriminator
             loss = 0
@@ -176,7 +179,10 @@ class gan_feat_stored(GAN):
             loss = loss_cls.clone()
             
             if args.adv:
-                feats, gen_targets = self._sample_vecs(inputs.shape[0])
+                if args.index_sampling:
+                    feats, gen_targets = self._sample_vecs_index(inputs.shape[0])
+                else:
+                    feats, gen_targets = self._sample_vecs(inputs.shape[0])
                 feats = feats.to(args.device)
                 gen_image = gen(feats.unsqueeze(2).unsqueeze(3).detach())
                 feats_gen, logits_cls_gen, logits_adv_gen = disc(gen_image)
@@ -193,13 +199,16 @@ class gan_feat_stored(GAN):
 
         disc.eval()
 
-        for i, (inputs, featmaps, targets) in enumerate(train_loader):
+        for i, (inputs, featmaps, targets, indexes) in enumerate(train_loader):
             inputs, featmaps, targets = inputs.to(args.device), featmaps.to(args.device), targets.to(args.device)
             loss = 0
             optimizer_g.zero_grad()
 
             # Optimize Generator
-            feats, gen_targets = self._sample_vecs(inputs.shape[0])
+            if args.index_sampling:
+                feats, gen_targets = self._sample_vecs_index(inputs.shape[0])
+            else:
+                feats, gen_targets = self._sample_vecs(inputs.shape[0])
             feats, gen_targets = feats.to(args.device), gen_targets.to(args.device)
             gen_image = gen(feats.unsqueeze(2).unsqueeze(3).detach())
 
@@ -242,7 +251,7 @@ class gan_feat_stored(GAN):
         ypred, ypred_gen = [], []
         ytrue, ytrue_gen = [], []
     #     gen_loss_lst = []
-        for i, (inputs, featmaps, targets) in enumerate(train_loader):
+        for i, (inputs, featmaps, targets, indexes) in enumerate(train_loader):
             inputs, featmaps, targets = inputs.to(args.device), featmaps.to(args.device), targets.to(args.device)
             # Optimize Discriminator
             loss = 0
@@ -253,7 +262,10 @@ class gan_feat_stored(GAN):
             _loss_cls += loss_cls.item()
             loss = loss_cls.clone()
             if args.adv:
-                feats, gen_targets = self._sample_vecs(inputs.shape[0])
+                if args.index_sampling:
+                    feats, gen_targets = self._sample_vecs_index(inputs.shape[0])
+                else:
+                    feats, gen_targets = self._sample_vecs(inputs.shape[0])
                 feats = feats.to(args.device)
                 gen_image = gen(feats.unsqueeze(2).unsqueeze(3).detach())
 
@@ -276,7 +288,10 @@ class gan_feat_stored(GAN):
             optimizer_g.zero_grad()
 
             # Optimize Generator
-            feats, gen_targets = self._sample_vecs(inputs.shape[0])
+            if args.index_sampling:
+                feats, gen_targets = self._sample_vecs_index(inputs.shape[0])
+            else:
+                feats, gen_targets = self._sample_vecs(inputs.shape[0])
             feats, gen_targets = feats.to(args.device), gen_targets.to(args.device)
             gen_image = gen(feats.unsqueeze(2).unsqueeze(3).detach())
 
@@ -325,7 +340,7 @@ class gan_feat_stored(GAN):
         ypred, ypred_gen = [], []
         ytrue, ytrue_gen = [], []
         cls_count = [0]*10
-        for i, (inputs, featmaps, targets) in enumerate(test_loader):
+        for i, (inputs, featmaps, targets, indexes) in enumerate(test_loader):
             loss = 0
             inputs, featmaps, targets = inputs.to(args.device), featmaps.to(args.device), targets.to(args.device)
 
@@ -338,7 +353,10 @@ class gan_feat_stored(GAN):
             ypred.extend(preds)
             ytrue.extend(targets)
             
-            feats, gen_targets = self._sample_vecs(inputs.shape[0])
+            if args.index_sampling:
+                feats, gen_targets = self._sample_vecs_index(inputs.shape[0])
+            else:
+                feats, gen_targets = self._sample_vecs(inputs.shape[0])
             feats, gen_targets = feats.to(args.device), gen_targets.to(args.device)
             gen_image = gen(feats.unsqueeze(2).unsqueeze(3).detach())
             feats_gen, logits_cls_gen, logits_adv_gen = disc(gen_image)
@@ -391,14 +409,17 @@ class gan_feat_stored(GAN):
         ypred, ypred_gen = [], []
         ytrue, ytrue_gen = [], []
     #     gen_loss_lst = []
-        for i, (inputs, featmaps, targets) in enumerate(train_loader):
+        for i, (inputs, featmaps, targets, indexes) in enumerate(train_loader):
             inputs, featmaps, targets = inputs.to(args.device), featmaps.to(args.device), targets.to(args.device)
             # Optimize Discriminator
 
             loss = 0
             optimizer_d.zero_grad()
 
-            feats, gen_targets = self._sample_vecs(inputs.shape[0])
+            if args.index_sampling:
+                feats, gen_targets = self._sample_vecs_index(inputs.shape[0])
+            else:
+                feats, gen_targets = self._sample_vecs(inputs.shape[0])
             feats, gen_targets = feats.to(args.device), gen_targets.to(args.device)
             gen_image = gen(feats.unsqueeze(2).unsqueeze(3).detach())
 
@@ -441,7 +462,7 @@ class gan_feat_stored(GAN):
         _loss, _loss_cls, _loss_cls_gen = 0., 0., 0.
         ypred, ypred_gen = [], []
         ytrue, ytrue_gen = [], []
-        for i, (inputs, featmaps, targets) in enumerate(test_loader):
+        for i, (inputs, featmaps, targets, indexes) in enumerate(test_loader):
             loss = 0
             inputs, featmaps, targets = inputs.to(args.device), featmaps.to(args.device), targets.to(args.device)
 
@@ -472,18 +493,40 @@ class gan_feat_stored(GAN):
         disc.eval()
         ypred, ypred_gen = [], []
         ytrue, ytrue_gen = [], []
-        for i, (inputs, featmaps, targets) in enumerate(train_loader):
+        for i, (inputs, featmaps, targets, indexes) in enumerate(train_loader):
             featmaps = featmaps.to(args.device)
             # Optimize Discriminator
             feats, logits_cls, logits_adv = disc(featmaps)
-            for i, target in enumerate(targets.detach().cpu().numpy().astype(int)):
-                self._class_features[target, class_idx[target]] = feats[i].detach().cpu().numpy()
+            for j, target in enumerate(targets.detach().cpu().numpy().astype(int)):
+                self._class_features[target, class_idx[target]] = feats[j].detach().cpu().numpy()
                 class_idx[target] += 1
             preds = F.softmax(logits_cls, dim=1).argmax(dim=1).cpu().numpy().tolist()
             ypred.extend(preds)
             ytrue.extend(targets)
         print(class_idx)
         acc = round((np.array(ypred) == np.array(ytrue)).sum() / len(ytrue), 4)  
+        print("Accuracy of model: ", acc)
+        disc.train()
+        
+    def _build_statistics_index(self, args, train_loader, disc):
+        print("Building & updating dataset with previous class statistics.")
+        self._features =  {}
+        self._targets = {}
+        disc.eval()
+        ypred, ypred_gen = [], []
+        ytrue, ytrue_gen = [], []
+        for i, (inputs, featmaps, targets, indexes) in enumerate(train_loader):
+            featmaps = featmaps.to(args.device)
+            # Optimize Discriminator
+            feats, logits_cls, logits_adv = disc(featmaps)
+            for j, target in enumerate(targets.detach().cpu().numpy().astype(int)):
+                self._features[int(indexes[j])] = feats[j].detach().cpu().numpy()
+                self._targets[int(indexes[j])] = targets[j]
+            preds = F.softmax(logits_cls, dim=1).argmax(dim=1).cpu().numpy().tolist()
+            ypred.extend(preds)
+            ytrue.extend(targets)
+        acc = round((np.array(ypred) == np.array(ytrue)).sum() / len(ytrue), 4)  
+        print(len(self._features.keys()), len(self._targets.keys()))
         print("Accuracy of model: ", acc)
         disc.train()
         
@@ -499,4 +542,20 @@ class gan_feat_stored(GAN):
         vec_targets = torch.stack(vec_targets).squeeze(1)
 #         import pdb
 #         pdb.set_trace()
+        return vecs, vec_targets
+              
+    def _sample_vecs_index(self, batch_size):
+        vecs = []
+        vec_targets = []
+        
+        indices = random.sample(list(self._features.keys()), batch_size)
+        for i in range(batch_size):
+            key = int(indices[i])
+            vecs.append(torch.Tensor(self._features[key]))
+            vec_targets.append(torch.Tensor([self._targets[key]]))
+#         import pdb
+#         pdb.set_trace()
+        vecs = torch.stack(vecs)
+        vec_targets = torch.stack(vec_targets).squeeze(1)
+       
         return vecs, vec_targets

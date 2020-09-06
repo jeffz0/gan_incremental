@@ -6,6 +6,7 @@ import os, sys
 
 import numpy as np
 import torch
+from torch.nn import Parameter
 import torch.utils.model_zoo as model_zoo
 from torch import nn, optim
 from torch.nn import functional as F
@@ -79,7 +80,7 @@ class BasicBlock(nn.Module):
 
 class ResNet(nn.Module):
 
-    def __init__(self, block, layers, num_classes=1000, zero_init_residual=False,
+    def __init__(self, block, layers, num_classes=10, zero_init_residual=False,
                  groups=1, width_per_group=64, replace_stride_with_dilation=None,
                  norm_layer=None, tanh=False):
         super(ResNet, self).__init__()
@@ -167,11 +168,14 @@ class ResNet(nn.Module):
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
-        featmap = x
+        featmaps = x
         x = self.layer4(x)
         x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        feats = x
+        x = self.fc(x)
         
-        return featmap, x
+        return featmaps, feats, x
 
     def forward(self, x):
         return self._forward_impl(x)
@@ -183,21 +187,35 @@ def _resnet(arch, block, layers, pretrained, progress, layer_4, fixed, tanh=Fals
         model_dict = load_state_dict_from_url(model_urls[arch],
                                               progress=progress)
 #         model_dict = model_zoo.load_url("https://download.pytorch.org/models/resnet18-5c106cde.pth")
-#         model_dict.pop('fc.weight', None)
-#         model_dict.pop('fc.bias', None)
-        model.load_state_dict(model_dict)
+        model_dict.pop('fc.weight', None)
+        model_dict.pop('fc.bias', None)
+        model.load_state_dict(load_my_state_dict(model, model_dict))
         if layer_4:
             for name,child in model.named_children():
-                if name != 'layer4':
+                if name != 'layer4' and name != 'fc':
                     for param in child.parameters():
                         param.requires_grad = False
         if fixed:
             for name,child in model.named_children():
-                for param in child.parameters():
-                    param.requires_grad = False
+                if name != 'layer4' and name != 'fc':
+                    for param in child.parameters():
+                        param.requires_grad = False
+        
     #     model.eval()
 #         model.load_state_dict(state_dict)
     return model
+
+def load_my_state_dict(model, state_dict):
+
+    own_state = model.state_dict()
+    for name, param in state_dict.items():
+        if name not in own_state:
+             continue
+        if isinstance(param, Parameter):
+            # backwards compatibility for serialized parameters
+            param = param.data
+        own_state[name].copy_(param)
+    return own_state
 
 
 def resnet18(pretrained=False, progress=True, layer_4=False, fixed=False, tanh=False):

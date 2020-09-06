@@ -180,7 +180,7 @@ class CIFAR10_featmap(Dataset):
             img_32 = self.target_transform(img_32)
 #             target = self.target_transform(target)
             
-        return img_224, featmap, target
+        return img_224, featmap, target, index
 
 
     def __len__(self):
