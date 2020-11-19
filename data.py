@@ -117,12 +117,12 @@ class CIFAR10_featmap(Dataset):
     }
 
     def __init__(self, root, train=True, transform=None, target_transform=None,
-                 download=False):
+                 download=False, imagenet=True):
 
         super(CIFAR10_featmap, self).__init__()
         self.root = root
         self.train = train  # training set or test set
-
+        self.imagenet = imagenet
         if self.train:
             downloaded_list = self.train_list
         else:
@@ -176,11 +176,12 @@ class CIFAR10_featmap(Dataset):
         img_224 = img_224.resize((224,224), resample=0)
         
         if self.transform is not None:
-            img_224 = self.transform(img_224)
-            img_32 = self.target_transform(img_32)
-#             target = self.target_transform(target)
+            if self.imagenet:
+                img = self.transform(img_224)
+            else:
+                img = self.target_transform(img_32)
             
-        return img_224, featmap, target, index
+        return img, featmap, target, index
 
 
     def __len__(self):
@@ -209,7 +210,7 @@ class CIFAR10_feature(Dataset):
     }
 
     def __init__(self, root, train=True, transform=None, target_transform=None,
-                 download=False):
+                 download=False, imagenet=None):
 
         super(CIFAR10_feature, self).__init__()
         self.root = root
@@ -268,11 +269,9 @@ class CIFAR10_feature(Dataset):
         img_224 = img_224.resize((224,224), resample=0)
         
         if self.transform is not None:
-            img_224 = self.transform(img_224)
-            img_32 = self.target_transform(img_32)
-#             target = self.target_transform(target)
+            img = self.target_transform(img_32)
             
-        return img_224, feature, target
+        return img, feature, target, index
 
 
     def __len__(self):

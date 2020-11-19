@@ -25,7 +25,7 @@ from torch.nn import functional as F
 import torchvision
 
 
-class gan_feat_stored_mse(GAN):
+class gan_random_z(GAN):
     """Implementation of Learning without Forgetting.
 
     :param args: An argparse parsed arguments object.
@@ -60,47 +60,12 @@ class gan_feat_stored_mse(GAN):
             optimizer_d = optim.Adam(disc.parameters(), lr=args.lr, betas=(0.5, 0.999))
             optimizer_d2 = optim.Adam(disc2.parameters(), lr=args.lr, betas=(0.5, 0.999))
         
-        if args.stored_features:
-            # Features from custom discriminator model
-            with open('data/resnet_features.pkl', 'rb') as f:
-                self._features = pickle.load(f)
-            with open('data/resnet_targets.pkl', 'rb') as f:
-                self._targets = pickle.load(f)
-            print("Loaded stored feature statistics")
-        elif args.stored_features_pretrained:
-            # Features from pretrained resnet model
-            with open('data/pretrained_resnet_features.pkl', 'rb') as f:
-                self._features = pickle.load(f)
-            with open('data/pretrained_resnet_targets.pkl', 'rb') as f:
-                self._targets = pickle.load(f)
-            print("Loaded stored pretrained feature statistics")
-        else:
-            for epoch in range(args.epochs_cls):
-                disc.train()
-                train_loss = self._train_cls(self.args, epoch+1, disc, train_loader, optimizer_d)
-                train_losses[epoch] = train_loss
-                # Frequency to output and visualize results
-                if (epoch+1) % args.visualize_freq == 0 or epoch == 0:
-                    test_loss = self._test_2(args, epoch+1, disc, test_loader, test_output_dir)
-                    test_losses[epoch] = test_loss
-
-                    torch.save(disc.state_dict(), model_output_dir + 'disc_cls.pth')
-                    print("Saved model")
-
-                    with open(output_dir +'/train_losses.txt', 'w') as f:
-                        json.dump(train_losses, f)
-                    with open(output_dir +'/test_losses.txt', 'w') as f:
-                        json.dump(test_losses, f)
-
-
-            self._build_statistics_index(args, train_loader, disc)
-        
         if args.resume:
             disc.load_state_dict(torch.load(model_output_dir + 'disc.pth'))
             gen.load_state_dict(torch.load(model_output_dir + 'gen.pth'))
             print("Loaded previous disc and gen")
         else:
-            for epoch in range(args.epochs_cls, args.epochs_cls+args.epochs):
+            for epoch in range(0, args.epochs):
                 disc.train()
                 gen.train()
 
@@ -116,7 +81,7 @@ class gan_feat_stored_mse(GAN):
                 gen.eval()
 
                 # Frequency to output and visualize results
-                if (epoch+1) % args.visualize_freq == 0 or epoch == args.epochs_cls:
+                if (epoch+1) % args.visualize_freq == 0 or epoch == 0:
                     test_loss = self._test(args, epoch+1, disc, gen, test_loader, test_output_dir)
                     test_losses[epoch] = test_loss
 
@@ -135,12 +100,12 @@ class gan_feat_stored_mse(GAN):
         if args.phase_2:
             disc.eval()
             gen.eval()
-            for epoch in range(args.epochs_cls+args.epochs, args.epochs_cls+args.epochs+args.epochs_2):
+            for epoch in range(args.epochs, args.epochs+args.epochs_2):
                 disc2.train()
                 train_loss = self._train_2(args, epoch+1, disc2, gen, train_loader, optimizer_d2, train_output_dir)
                 train_losses[epoch] = train_loss
                 disc2.eval()
-                if (epoch+1) % args.visualize_freq == 0 or epoch == args.epochs_cls+args.epochs or (epoch+1) == args.epochs_cls+args.epochs+args.epochs_2:
+                if (epoch+1) % args.visualize_freq == 0 or epoch == args.epochs or (epoch+1) == args.epochs+args.epochs_2:
                     test_loss = self._test_2(args, epoch+1, disc2, test_loader, test_output_dir)
                     test_losses[epoch] = test_loss
 
@@ -210,7 +175,7 @@ class gan_feat_stored_mse(GAN):
             
             if args.adv:
 
-                feats, gen_targets = self._sample_vecs_index(inputs.shape[0], indexes)
+                feats, gen_targets = self._sample_vecs_index(inputs.shape[0])
               
                 feats = feats.to(args.device)
                 gen_image = gen(feats.unsqueeze(2).unsqueeze(3).detach())
@@ -238,7 +203,7 @@ class gan_feat_stored_mse(GAN):
                 inputs = featmaps
 
             # Optimize Generator
-            feats, gen_targets = self._sample_vecs_index(images.shape[0], indexes)
+            feats, gen_targets = self._sample_vecs_index(images.shape[0])
 
             feats, gen_targets = feats.to(args.device), gen_targets.to(args.device)
             gen_image = gen(feats.unsqueeze(2).unsqueeze(3).detach())
@@ -301,7 +266,7 @@ class gan_feat_stored_mse(GAN):
             _loss_cls += loss_cls.item()
             loss = loss_cls.clone()
             if args.adv:
-                feats, gen_targets = self._sample_vecs_index(images.shape[0], indexes)
+                feats, gen_targets = self._sample_vecs_index(images.shape[0])
                
                 feats = feats.to(args.device)
             
@@ -326,7 +291,7 @@ class gan_feat_stored_mse(GAN):
             optimizer_g.zero_grad()
 
             # Optimize Generator
-            feats, gen_targets = self._sample_vecs_index(images.shape[0], indexes)
+            feats, gen_targets = self._sample_vecs_index(images.shape[0])
             feats, gen_targets = feats.to(args.device), gen_targets.to(args.device)
             gen_image = gen(feats.unsqueeze(2).unsqueeze(3).detach())
 
@@ -387,7 +352,7 @@ class gan_feat_stored_mse(GAN):
         for i, (inputs, featmaps, targets, indexes) in enumerate(test_loader):
             inputs, featmaps, targets = inputs.to(args.device), featmaps.to(args.device), targets.to(args.device)
             
-            feats, gen_targets = self._sample_vecs_index(inputs.shape[0], indexes)
+            feats, gen_targets = self._sample_vecs_index(inputs.shape[0])
             feats, gen_targets = feats.to(args.device), gen_targets.to(args.device)
             gen_image = gen(feats.unsqueeze(2).unsqueeze(3).detach())
             
@@ -397,43 +362,42 @@ class gan_feat_stored_mse(GAN):
                 class_idx[target] += 1
                 
         print(class_idx)
-    
-#         plt.figure(figsize=(12,12))
-#         plt.imshow(pairwise_distances(np.vstack(class_featmaps[0:10]),metric='l2'))
-#         plt.colorbar()
-#         plt.savefig("self.png")
-#         plt.close()
+        plt.figure(figsize=(12,12))
+        plt.imshow(pairwise_distances(np.vstack(class_featmaps[0:10]),metric='l2'))
+        plt.colorbar()
+        plt.savefig("self.png")
+        plt.close()
 
-#         print(class_idx)
-#         plt.figure(figsize=(12,12))
-#         plt.imshow(pairwise_distances(np.vstack(class_featmaps_gen[0:10]),metric='l2'))
-#         plt.colorbar()
-#         plt.savefig("self_gen.png")
-#         plt.close()
+        print(class_idx)
+        plt.figure(figsize=(12,12))
+        plt.imshow(pairwise_distances(np.vstack(class_featmaps_gen[0:10]),metric='l2'))
+        plt.colorbar()
+        plt.savefig("self_gen.png")
+        plt.close()
         
-#         plt.figure(figsize=(12,12))
-#         plt.imshow(pairwise_distances(np.vstack(class_featmaps[0:10]), np.vstack(class_featmaps_gen[0:10]), metric='l2'))
-#         plt.colorbar()
-#         plt.savefig("pair.png")
-#         plt.close()
+        plt.figure(figsize=(12,12))
+        plt.imshow(pairwise_distances(np.vstack(class_featmaps[0:10]), np.vstack(class_featmaps_gen[0:10]), metric='l2'))
+        plt.colorbar()
+        plt.savefig("pair.png")
+        plt.close()
         
-#         plt.figure(figsize=(12,12))
-#         plt.imshow(pairwise_distances(np.vstack(class_featmaps[0:10]),metric='cosine'))
-#         plt.colorbar()
-#         plt.savefig("self_cosine.png")
-#         plt.close()
+        plt.figure(figsize=(12,12))
+        plt.imshow(pairwise_distances(np.vstack(class_featmaps[0:10]),metric='cosine'))
+        plt.colorbar()
+        plt.savefig("self_cosine.png")
+        plt.close()
 
-#         plt.figure(figsize=(12,12))
-#         plt.imshow(pairwise_distances(np.vstack(class_featmaps_gen[0:10]),metric='cosine'))
-#         plt.colorbar()
-#         plt.savefig("self_gen_cosine.png")
-#         plt.close()
+        plt.figure(figsize=(12,12))
+        plt.imshow(pairwise_distances(np.vstack(class_featmaps_gen[0:10]),metric='cosine'))
+        plt.colorbar()
+        plt.savefig("self_gen_cosine.png")
+        plt.close()
         
-#         plt.figure(figsize=(12,12))
-#         plt.imshow(pairwise_distances(np.vstack(class_featmaps[0:10]), np.vstack(class_featmaps_gen[0:10]), metric='cosine'))
-#         plt.colorbar()
-#         plt.savefig("pair_cosine.png")
-#         plt.close()
+        plt.figure(figsize=(12,12))
+        plt.imshow(pairwise_distances(np.vstack(class_featmaps[0:10]), np.vstack(class_featmaps_gen[0:10]), metric='cosine'))
+        plt.colorbar()
+        plt.savefig("pair_cosine.png")
+        plt.close()
         
         
         for i, (images, featmaps, targets, indexes) in enumerate(test_loader):
@@ -452,7 +416,7 @@ class gan_feat_stored_mse(GAN):
             ypred.extend(preds)
             ytrue.extend(targets)
             
-            feats, gen_targets = self._sample_vecs_index(inputs.shape[0], indexes)
+            feats, gen_targets = self._sample_vecs_index(inputs.shape[0])
             feats, gen_targets = feats.to(args.device), gen_targets.to(args.device)
             gen_image = gen(feats.unsqueeze(2).unsqueeze(3).detach())
             feats_gen, logits_cls_gen, logits_adv_gen = disc(gen_image)
@@ -522,7 +486,7 @@ class gan_feat_stored_mse(GAN):
             loss = 0
             optimizer_d.zero_grad()
 
-            feats, gen_targets = self._sample_vecs_index(inputs.shape[0], indexes)
+            feats, gen_targets = self._sample_vecs_index(inputs.shape[0])
             feats, gen_targets = feats.to(args.device), gen_targets.to(args.device)
             gen_image = gen(feats.unsqueeze(2).unsqueeze(3).detach())
 
@@ -584,10 +548,6 @@ class gan_feat_stored_mse(GAN):
 
         acc = round((np.array(ypred) == np.array(ytrue)).sum() / len(ytrue), 4)  
         acc_gen = round((np.array(ypred_gen) == np.array(ytrue_gen)).sum() / len(ytrue), 4)  
-        
-        for cls in range(10):
-            mask = np.where(np.array(ytrue) == cls)
-            print(round((np.array(ypred)[mask] == np.array(ytrue)[mask]).sum() / len(mask[0]), 4))
 
         print("Test 2 Set Epoch {}, Training Iteration {}".format(epoch, i))
         print("Accuracy: {}, Accuracy gen: {}".format(acc, acc_gen))
@@ -623,15 +583,16 @@ class gan_feat_stored_mse(GAN):
         disc.train()
 
               
-    def _sample_vecs_index(self, batch_size, indices):
-        vecs = []
-        vec_targets = []
-
-        for i in range(batch_size):
-            key = int(indices[i])
-            vecs.append(torch.Tensor(self._features[key]))
-            vec_targets.append(torch.Tensor([self._targets[key]]))
-        vecs = torch.stack(vecs)
-        vec_targets = torch.stack(vec_targets).squeeze(1)
-       
-        return vecs, vec_targets
+    def _sample_vecs_index(self, batch_size, labels=None):
+        nz=512
+        num_classes=10
+        if labels is None:
+            label = np.random.randint(0, 10, batch_size)
+        else:
+            label = labels.detach().cpu().numpy()
+        noise_ = np.random.normal(0, 1, (batch_size, 512))
+        class_onehot = np.zeros((batch_size, num_classes))
+        class_onehot[np.arange(batch_size), label] = 1
+        noise_[np.arange(batch_size), :num_classes] = class_onehot[np.arange(batch_size)]
+        noise_ = (torch.from_numpy(noise_))
+        return noise_.view(batch_size, 512).float(), torch.from_numpy(label).float()

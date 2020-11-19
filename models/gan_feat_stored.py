@@ -8,7 +8,7 @@ import os, sys
 import json
 from models.base import GAN
 
-from utils import visualize_featmap as visualize, adversarial_loss, visualize_graph, print_statement, return_statement, visualize_featmap_classes
+from utils import visualize, adversarial_loss, visualize_graph, print_statement, return_statement, visualize_classes
 
 import numpy as np
 import factory

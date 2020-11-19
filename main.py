@@ -7,7 +7,7 @@ import pdb
 import os, sys
 import json
 
-from utils import visualize_featmap as visualize, adversarial_loss, visualize_graph
+from utils import visualize, adversarial_loss, visualize_graph
 
 import numpy as np
 import factory
@@ -114,7 +114,7 @@ if __name__ == "__main__":
             os.mkdir(os.path.join(test_output_dir, str(i)))
 
     # Load data
-    train_loader, test_loader = factory.get_data("featmap", args.batch_size, args.workers)
+    train_loader, test_loader = factory.get_data(args.data, args.batch_size, args.workers, args.model == "featmap")
 
     # Load models
     disc = factory.get_discriminator(args.data, args.disc).to(args.device)
@@ -139,6 +139,7 @@ if __name__ == "__main__":
         model._build_statistics_index(args, train_loader, disc)
 #         test_loss = model._test(args, args.epochs_cls+args.epochs+1, disc, gen, test_loader, test_output_dir)
         test_loss = model._test(args, args.epochs, disc, gen, test_loader, test_output_dir)
+#         test_loss = model._test_2(args, args.epochs, disc2, test_loader, test_output_dir)
 #         with open(output_dir +'/train_losses.txt', 'r') as f:
 #             train_losses = json.load(f)
 

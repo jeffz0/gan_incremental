@@ -36,18 +36,22 @@ class Generator(nn.Module):
         else:
             self.decoder = nn.Sequential(
                 nn.Upsample(size=(2,2), mode='nearest'),
+#                 nn.interpolate(size=(2,2), mode='nearest'),
                 nn.Conv2d(512, nfms*8, kernel_size=2, stride=1, padding=1), 
                 nn.LeakyReLU(0.2, inplace=True),
                 # state size. 
                 nn.Upsample(size=(4,4), mode='nearest'),
+#                 nn.interpolate(size=(4,4), mode='nearest'),
                 nn.Conv2d(nfms*8, 256, kernel_size=3, stride=1, padding=1),
                 nn.LeakyReLU(0.2, inplace=True),
                 # state size. (ngf*8) x 4 x 4
                 nn.Upsample(size=(8,8), mode='nearest'),
+#                 nn.interpolate(size=(8,8), mode='nearest'),
                 nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1),
                 nn.LeakyReLU(0.2, inplace=True),
                 # state size. (ngf*4) x 8 x 8
                 nn.Upsample(size=(14,14), mode='nearest'),
+#                 nn.interpolate(size=(14,14), mode='nearest'),
                 nn.Conv2d( 256, 256, kernel_size=3, stride=1, padding=1),
             )
         self.output_act = nn.Tanh()
@@ -150,10 +154,28 @@ class Generator_Image(nn.Module):
         decoded = self.output_act(decoded)
         return decoded
 
+class Generator_Feature(nn.Module):
+    def __init__(self):
+        super(Generator_Feature, self).__init__()
+        self.main = nn.Sequential(
+            nn.Linear(512, 512),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Linear(512, 512),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Linear(512, 512),
+            nn.ReLU(inplace=True),
+        )
+
+    def forward(self, x):
+        decoded = self.main(x)
+        return decoded
 
 
 def generator_image(deconv):
     return Generator_Image(width=32, deconv=deconv)
+
+def generator_feature():
+    return Generator_Feature()
 
 def generator(deconv):
     return Generator(width=32, deconv=deconv)

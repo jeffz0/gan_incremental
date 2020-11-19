@@ -188,6 +188,8 @@ class Discriminator_Image(nn.Module):
     def __init__(self, width = 32):
         super(Discriminator_Image, self).__init__()
         ndf = 32
+        self.fc_cls = nn.Linear(512, 10)
+        self.fc_adv = nn.Linear(512, 1)
         self.main = nn.Sequential(
             # state size. (ndf) x 32 x 32
             nn.Conv2d(3, ndf * 2, 4, 2, 1, bias=True),
@@ -199,16 +201,23 @@ class Discriminator_Image(nn.Module):
             nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=True),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*8) x 4 x 4
-            nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=True),
+            nn.Conv2d(ndf * 8, ndf * 16, 4, 1, 0, bias=True),
+            nn.LeakyReLU(0.2, inplace=True),
         )
 
     def forward(self, input):
-        return self.main(input)
+        feats = self.main(input)
+        feats = torch.flatten(feats, 1)
+        logits_cls = self.fc_cls(feats)
+        logits_adv = self.fc_adv(feats)
+        return feats, logits_cls, logits_adv
     
 class Discriminator_Feature(nn.Module):
 
     def __init__(self):
         super(Discriminator_Feature, self).__init__()
+        self.fc_cls = nn.Linear(512, 10)
+        self.fc_adv = nn.Linear(512, 1)
         self.main = nn.Sequential(
             nn.Linear(512, 200),
             nn.LeakyReLU(0.2, inplace=True),
@@ -219,7 +228,10 @@ class Discriminator_Feature(nn.Module):
         )
 
     def forward(self, input):
-        return self.main(input)
+        feats = self.main(input)
+        logits_cls = self.fc_cls(feats)
+        logits_adv = self.fc_adv(feats)
+        return feats, logits_cls, logits_adv
     
     
 def discriminator_image():
@@ -227,6 +239,9 @@ def discriminator_image():
 
 def discriminator_no_resnet():
     return Discriminator_no_resnet(32)
+
+def discriminator_feature():
+    return Discriminator_Feature()
     
 def discriminator():
     return Discriminator(BasicBlock, [2,2,2,2], tanh=False)
